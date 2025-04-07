@@ -21,35 +21,30 @@ template <typename T>
 struct ComparisionTrait<T, Eq> {
    static const std::string Name() { return "Equal"; }
    static std::string Op(const std::string & t1, const std::string t2) { return t1 + " == " +  t2 + " ? true : false "; }
-   static bool Result(T v1, T v2) { return v1 == v2;}
 };
 
 template <typename T>
 struct ComparisionTrait<T, Less> {
    static const std::string Name() { return "Less"; }
    static std::string Op(const std::string & t1, const std::string t2) { return t1 + " < " + t2 + " ? true : false "; }
-   static bool Result(T v1, T v2) { return v1 < v2;}
 };
 
 template <typename T>
 struct ComparisionTrait<T, LessEq> {
    static const std::string Name() { return "LessOrEqual"; }
    static std::string Op(const std::string & t1, const std::string t2) { return t1 + " <= " +  t2 + " ? true : false ";  }
-   static bool Result(T v1, T v2) { return v1 <= v2;}
 };
 
 template <typename T>
 struct ComparisionTrait<T, Greater> {
    static const std::string Name() { return "Greater"; }
    static std::string Op(const std::string & t1, const std::string t2) { return  t1 + " > " +  t2 + " ? true : false "; }
-   static bool Result(T v1, T v2) { return v1 > v2;}
 };
 
 template <typename T>
 struct ComparisionTrait<T, GreaterEq> {
    static const std::string Name() { return "GreaterOrEqual"; }
    static std::string Op(const std::string & t1, const std::string t2) { return t1 + " >= " +  t2 + " ? true : false " ; }
-   static bool Result(T v1, T v2) { return v1 >= v2;}
 };
 
 template<typename T, EComparisionOperator Op>
@@ -73,12 +68,7 @@ private:
 public:
    ROperator_Comparision(){}
    ROperator_Comparision(const std::string & nameX1, const std::string & nameX2, const std::string & nameY):
-      fNX1(UTILITY::Clean_name(nameX1)), fNX2(UTILITY::Clean_name(nameX2)), fNY(UTILITY::Clean_name(nameY)){
-         fInputTensorNames = { fNX1, fNX2 };
-         
-         // output will be a boolean vector so should not be considered for memory optimized pool
-         fOutputTensorNames = { fNY };
-      }
+      fNX1(UTILITY::Clean_name(nameX1)), fNX2(UTILITY::Clean_name(nameX2)), fNY(UTILITY::Clean_name(nameY)){}
 
    // type of output given input
    std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
@@ -144,23 +134,7 @@ public:
       } else {
          fShapeY = fShapeX1;
       }
-      // case of constant tensors
-      if (model.IsInitializedTensor(fNX1) && model.IsInitializedTensor(fNX2) ) {
-         fIsOutputConstant = true;
-         auto data1 = static_cast<T *>(model.GetInitializedTensorData(fNX1).get());
-         auto data2 = static_cast<T *>(model.GetInitializedTensorData(fNX2).get());
-         size_t length = ConvertShapeToLength(fShapeY);
-         bool * outData = new bool[length];
-         for (size_t i = 0; i < length; i++)
-            outData[i] = ComparisionTrait<T,Op>::Result(data1[i], data2[i]);
-         model.AddConstantTensor(fNY, fShapeY, outData);
-         if (model.Verbose())
-            std::cout <<  ComparisionTrait<T,Op>::Name() << " op ---> " << fNY << "  " << ConvertShapeToString(fShapeY) << " : "
-               << ConvertValuesToString(length,outData) << std::endl;
-         delete [] outData;
-      } else {
-         model.AddIntermediateTensor(fNY, ETensorType::BOOL , fShapeY);
-      }
+      model.AddIntermediateTensor(fNY, ETensorType::BOOL , fShapeY);
       // check if this is not output operators to add a specific line for definining the tensor_xxx variable
       const auto & outputTensorNames = model.GetOutputTensorNames();
       fIsModelOutput = false;
@@ -169,7 +143,6 @@ public:
    }
 
    std::string Generate(std::string OpName) override {
-      if (fIsOutputConstant) return "";
       OpName = "op_" + OpName;
 
      if (fShapeY.empty()) {

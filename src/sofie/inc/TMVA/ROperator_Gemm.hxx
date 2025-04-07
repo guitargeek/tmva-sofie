@@ -36,7 +36,6 @@ namespace SOFIE{
       std::string fNC2; // bias tensor name after broadcasting
       std::string fNY;
       std::string fType;
-      EActivationType fActivation;
       std::vector<Dim> fShapeA;
       std::vector<Dim> fShapeB;
       std::vector<size_t> fShapeC;
@@ -45,29 +44,25 @@ namespace SOFIE{
    public:
 
       ROperator_Gemm(){}
-      ROperator_Gemm(float alpha, float beta, int_t transA, int_t transB, std::string nameA, std::string nameB, std::string nameY, EActivationType activation=EActivationType::UNDEFINED):
+      ROperator_Gemm(float alpha, float beta, int_t transA, int_t transB, std::string nameA, std::string nameB, std::string nameY):
          fAttrAlpha(alpha), fAttrBeta(beta), fAttrTransA(transA), fAttrTransB(transB), fNA(UTILITY::Clean_name(nameA)),
          fNB(UTILITY::Clean_name(nameB)), fNY(UTILITY::Clean_name(nameY))
       {
-         fActivation = activation;
          fType = "float";
          static_assert(std::is_same_v<T, float>,
                   "TMVA::SOFIE - Unsupported type parsing a Gemm operator");
-         fInputTensorNames = { fNA, fNB };
-         fOutputTensorNames = { fNY };
       }
 
-      ROperator_Gemm(float alpha, float beta, int_t transA, int_t transB, std::string nameA, std::string nameB, std::string nameC, std::string nameY, EActivationType activation=EActivationType::UNDEFINED):
+      ROperator_Gemm(float alpha, float beta, int_t transA, int_t transB, std::string nameA, std::string nameB, std::string nameC, std::string nameY):
          fAttrAlpha(alpha), fAttrBeta(beta), fAttrTransA(transA), fAttrTransB(transB), fNA(UTILITY::Clean_name(nameA)),
-         fNB(UTILITY::Clean_name(nameB)), fNC(UTILITY::Clean_name(nameC)), fNY(UTILITY::Clean_name(nameY)), fActivation(activation)
+         fNB(UTILITY::Clean_name(nameB)), fNC(UTILITY::Clean_name(nameC)), fNY(UTILITY::Clean_name(nameY))
       {
-         fActivation = activation;
          fType = "float";
-
-         fOutputTensorNames = { fNY };
+         static_assert(std::is_same_v<T, float>,
+                  "TMVA::SOFIE - Unsupported type parsing a Gemm operator");
       }
 
-      std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+      std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
          ETensorType out = input[0];
          return {out};
       }
@@ -104,22 +99,9 @@ namespace SOFIE{
          std::vector<U> s_y;
          s_y.reserve(input[0].size());
          if (input[0].size() > 2 && input[1].size() == input[0].size()) {
-            // in case of dim > 2 first dimensions are equal to the input ones not
-            // equal to 1 (e.g. (1,2,3) * (2,3,4) -> (2,2,4))
-            for (size_t i = 0; i < input[0].size()-2; i++) {
-               Dim valueA = input[0][i];
-               Dim valueB = input[1][i];
-               if (valueA.GetVal() != valueB.GetVal()) {
-                  if (valueB.GetVal() == "1")
-                     s_y.push_back(input[0][i]);
-                  else if (valueA.GetVal() == "1")
-                     s_y.push_back(input[1][i]);
-                  else
-                     throw std::runtime_error("TMVA SOFIE Gemm Op - invalid input shapes " + valueA.GetVal() + " and "
-                        + valueB.GetVal());
-               }
+            // in case of dim > 2 first dimensions are equal to input ones
+            for (size_t i = 0; i < input[0].size()-2; i++)
                s_y.push_back(input[0][i]);
-            }
          }
 
          s_y.push_back(s_a[0]);
@@ -128,7 +110,7 @@ namespace SOFIE{
          return ret;
       }
 
-      std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+      std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
          return DoShapeInference<size_t>(input);
       }
       std::vector<std::vector<Dim>> DynamicShapeInference(const std::vector<std::vector<Dim>> & input){
@@ -137,7 +119,7 @@ namespace SOFIE{
 
 
 
-      void Initialize(RModel& model) override {
+      void Initialize(RModel& model){
          //TODO: propagate A or B as specified by ONNX standard
 
          if ((model.CheckIfTensorAlreadyExist(fNA) == false) || (model.CheckIfTensorAlreadyExist(fNB) == false) ){   //input must be a graph input, or already initialized intermediate tensor
@@ -148,7 +130,7 @@ namespace SOFIE{
                throw std::runtime_error("TMVA SOFIE Gemm Op Input Tensor" + fNC + " is not found in model");
             }
          }
-         if (model.IsDynamicTensor(fNA) || model.IsDimInputTensor(fNA) ) {
+         if (model.IsDynamicTensor(fNA) || model.IsInputTensor(fNA) ) {
             fShapeA = model.GetDynamicTensorShape(fNA);
             fIsDynamic = true;
          } else {
@@ -156,13 +138,13 @@ namespace SOFIE{
             fShapeA = ConvertShapeToDim(shapeA_int);
          }
          // case A is of dim1 we prepend a 1 but we need to remove later
-         bool prependOne = false;
+         bool appendOne = false;
          if (fShapeA.size() == 1) {
             fShapeA.insert(fShapeA.begin(), Dim(1));
-            prependOne = true;
+            appendOne = true;
          }
 
-         if (model.IsDynamicTensor(fNB) || model.IsDimInputTensor(fNB)) {
+         if (model.IsDynamicTensor(fNB) || model.IsInputTensor(fNB)) {
             fShapeB = model.GetDynamicTensorShape(fNB);
             fIsDynamic = true;
          }
@@ -170,22 +152,12 @@ namespace SOFIE{
             auto shapeB_int = model.GetTensorShape(fNB);
             fShapeB = ConvertShapeToDim(shapeB_int);
          }
-         // case B is dim1 we append a 1 but we need to remove later
-         bool appendOne = false;
-         if (fShapeB.size() == 1) {
-            fShapeB.insert(fShapeB.end(), Dim(1));
-            appendOne = true;
-         }
          // assume if not shape is 2 that extra values are 1.
-         // implement also MatMul case where we stack matrices (see numpy.matmul)
-         if (fShapeA.size() != fShapeB.size()) {
-            // if different dimensions we prepend 1 values
-            if (fShapeA.size() < fShapeB.size()) {
-               fShapeA.insert(fShapeA.begin(), fShapeB.size()-fShapeA.size(), Dim(1));
-            } else if (fShapeB.size() < fShapeA.size()) {
-               fShapeB.insert(fShapeB.begin(), fShapeA.size()-fShapeB.size(), Dim(1));
-            }
-         }
+         // we need to implement MatMul case where we stack matrices (see numpy.matmul)
+
+         if (fShapeA.size() != fShapeB.size())
+              throw std::runtime_error("TMVA SOFIE Gemm Op Input Tensors have not compatible shapes. A " +
+               ConvertDynamicShapeToString(fShapeA) + " B " + ConvertDynamicShapeToString(fShapeB) );
 
          fShapeY = DynamicShapeInference({fShapeA, fShapeB})[0];
          std::vector<size_t> shapeY;
@@ -204,10 +176,12 @@ namespace SOFIE{
             }
             fShapeC = model.GetTensorShape(fNC);
             fNC2 = fNC;
-            size_t lengthC = ConvertShapeToLength(fShapeC);
-            size_t lengthY = ConvertShapeToLength(shapeY);
-            // for dynamic outputs broadcasting is always done
-            bool broadcast_needed = lengthC != lengthY;
+            bool broadcast_needed = !UTILITY::AreSameShape(fShapeC, fShapeY);
+
+            // For Gemm broadcasting is not needed if fShapeY[0] == 1 i.e. C and Y have same length
+            //if (fShapeY[0] == 1 && ConvertShapeToLength(fShapeC) != ConvertShapeToLength(fShapeY)) {
+            //   broadcast_needed = false;
+            //}
 
 
             if (broadcast_needed) {
@@ -239,18 +213,12 @@ namespace SOFIE{
             }
          }
 
-         // remove appended or prepended value of 1
-         if (prependOne) {
+         if (appendOne) {
+            // remove appended value of 1
             if (fIsDynamic)
                fShapeY.erase(fShapeY.begin());
             else
                shapeY.erase(shapeY.begin());
-         }
-         if (appendOne) {
-            if (fIsDynamic)
-               fShapeY.erase(fShapeY.end()-1);
-            else
-               shapeY.erase(shapeY.end()-1);
          }
 
          if (!fIsDynamic)
@@ -267,9 +235,11 @@ namespace SOFIE{
          }
 
          model.AddNeededStdLib("algorithm");
+
       }
 
-      std::string GenerateInitCode() override {
+      std::string GenerateInitCode()
+      {
          std::stringstream out;
          // generate initialization code for broadcasting of bias tensor
          if (fShapeC.size() != fShapeY.size() && fNC != fNC2) {
@@ -290,7 +260,7 @@ namespace SOFIE{
          return out.str();
       }
 
-      std::string Generate(std::string opName) override {
+      std::string Generate(std::string opName){
          opName = "op_" + opName;
 
          if (fShapeA.empty() || fShapeB.empty() || fShapeY.empty() || (fNC != "" && fShapeC.empty())) {
@@ -311,7 +281,6 @@ namespace SOFIE{
          auto n = (fAttrTransB ? fShapeB[dimB-2].GetVal() : fShapeB[dimB-1].GetVal());
          auto k = (fAttrTransA ? fShapeA[dimA-2].GetVal() : fShapeA[dimA-1].GetVal());
          std::vector<Dim> sY = {fShapeY[dimY-2], fShapeY[dimY-1]};
-         // extra dimensions in case of stacked MatMul
          std::vector<Dim> sA;
          for (int64_t i = 0; i < dimY-2; i++) {
             sA.push_back(fShapeY[i]);
@@ -374,12 +343,6 @@ namespace SOFIE{
              << "tensor_" << fNY;
              if (doStackMul) out << " + " << opName << "_yoffset";
              out << ", &" << opName << "_n);\n";
-
-            if(fActivation == EActivationType::RELU){
-               out << SP << "for (int id = 0; id < " << TMVA::Experimental::SOFIE::ConvertDynamicShapeToLength(fShapeY) << " ; id++){\n";
-               out << SP << SP << "tensor_" << fNY << "[id] = ((tensor_" << fNY << "[id] > 0 )? tensor_" << fNY << "[id] : 0);\n";
-               out << SP << "}\n";
-            }
          }
 
          if (doStackMul) {
@@ -390,7 +353,7 @@ namespace SOFIE{
          return out.str();
       }
 
-      std::vector<std::string> GetBlasRoutines() override { return { std::string("Gemm"), std::string("Gemv") }; }
+      std::vector<std::string> GetBlasRoutines() { return { std::string("Gemm"), std::string("Gemv") }; }
 
    };
 

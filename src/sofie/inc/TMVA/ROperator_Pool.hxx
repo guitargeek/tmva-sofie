@@ -80,18 +80,16 @@ public:
          throw
             std::runtime_error("TMVA SOFIE Encountered unsupported type parsing a Pool operator");
       }
-      fInputTensorNames = { fNX };
-      fOutputTensorNames = { fNY };
    }
 
    // return input type (defined abstract in ROperator class )
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) {
       // only one input in Pool operators
       return input;
    }
 
    // function returning output shape given input
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) {
       // shape of pooling input has to be (according to ONNX): NxCxHxW
       // Where N is batch size, C : input  channels, H : input height, W = input width
       // or it can be [N, C, F1,F2,....FN] . Minimum dimension is 3
@@ -200,7 +198,7 @@ public:
       return ret;
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model) {
 
       fUseSession = model.UseSession();
 
@@ -237,13 +235,14 @@ public:
 
    }
 
-   std::string GenerateInitCode() override {
+   std::string GenerateInitCode() {
       std::stringstream out;
       return out.str();
    }
 
    // generate code for Session data members (e.g. internal vectors)
-   virtual std::string GenerateSessionMembersCode(std::string opName) override {
+   virtual std::string GenerateSessionMembersCode(std::string opName)
+   {
       opName = "op_" + opName;
       std::stringstream out;
       // input matrix padded with zero
@@ -265,7 +264,7 @@ public:
       return out.str();
    }
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName) {
       OpName = "op_" + OpName;
 
       if (fShapeX.empty() || fShapeY.empty()) {

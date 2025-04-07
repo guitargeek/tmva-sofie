@@ -26,16 +26,13 @@ private:
 public:
    ROperator_Tile(){}
    ROperator_Tile(std::string nameRepeat, std::string nameInput, std::string nameY):
-      fNRepeats(UTILITY::Clean_name(nameRepeat)),fNInput(UTILITY::Clean_name(nameInput)), fNY(UTILITY::Clean_name(nameY)){
-         fInputTensorNames = { fNRepeats, fNInput };
-         fOutputTensorNames = { fNY };
-      }
+      fNRepeats(UTILITY::Clean_name(nameRepeat)),fNInput(UTILITY::Clean_name(nameInput)), fNY(UTILITY::Clean_name(nameY)){}
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
       return input;
    }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
       std::vector<size_t> ret = input[0];
 
       for(size_t i=0; i < input[1].size(); i++) {
@@ -44,7 +41,7 @@ public:
       return {ret};
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model){
        //input must be a graph input, or already initialized intermediate tensor
       if (model.CheckIfTensorAlreadyExist(fNInput) == false){
         throw std::runtime_error("TMVA SOFIE Tile Op Input Tensor is not found in model");
@@ -88,7 +85,7 @@ public:
             << " given repeats " << ConvertShapeToString(repeats_vector) << std::endl;
    }
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName){
       OpName = "op_" + OpName;
       if (fShapeInput.empty() || fShapeY.empty()) {
             throw std::runtime_error("TMVA SOFIE Tile Op called to Generate without being initialized first");

@@ -37,17 +37,14 @@ public:
         fNK(UTILITY::Clean_name(nameK)),
         fNX(UTILITY::Clean_name(nameX)),
         fNVal(UTILITY::Clean_name(nameVal)),
-        fNInd(UTILITY::Clean_name(nameInd)){
-            fInputTensorNames = { fNX, fNK };
-            fOutputTensorNames = { fNVal, fNInd };
-        }
+        fNInd(UTILITY::Clean_name(nameInd)){}
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) {
          ETensorType ret = input[0];
          return {ret, ret};
       }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(const std::vector<std::vector<size_t>> input) {
       if (input.size() != 2) {
          throw std::runtime_error("TMVA SOFIE TopK Op Shape Inference needs exactly 2 input tensors");
       }
@@ -60,7 +57,8 @@ public:
    }
 
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel &model)
+   {
       if (model.CheckIfTensorAlreadyExist(fNX) == false) {
          // input must be a graph input, or already initialized intermediate tensor
          throw std::runtime_error("TMVA SOFIE TopK Op Input Tensor is not found in model");
@@ -104,71 +102,70 @@ public:
 
 
       model.AddIntermediateTensor(fNVal, model.GetTensorType(fNX), fShapeY);
-      // output indices should be an int64 tensor
-      model.AddIntermediateTensor(fNInd, ETensorType::INT64, fShapeY);
+      model.AddIntermediateTensor(fNInd, model.GetTensorType(fNX), fShapeY);
       fType = ConvertTypeToString(model.GetTensorType(fNX));
    }
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName)
+   {
       OpName = "op_" + OpName;
       if (fShapeX.empty()) {
          throw std::runtime_error("TMVA SOFIE Operator TopK called to Generate without being initialized first");
       }
       std::stringstream out;
       size_t size = fShapeX.size();
-      size_t axis = fAttrAxis < 0 ? size + fAttrAxis : fAttrAxis;
+      size_t axis = fAttrAxis < 0 ? size + fAttrAxis : fAttrAxis;  // not really needed
       out << "\n" << SP << "//------ TopK\n";
 
       size_t length=ConvertShapeToLength(fShapeX);
-      auto strideX = UTILITY::ComputeStrideFromShape(fShapeX);
-      auto strideY = UTILITY::ComputeStrideFromShape(fShapeX);
-      // we perform loop on dimension before sorted axis and after sorted axis
-      size_t n_before = (axis>0) ? length/strideX[axis-1] : 1;
-      size_t n_after = strideX[axis];
-      size_t n_elements = fShapeX[axis]; // number of elements to be sorted
+      size_t bound=1;
+      for(size_t i = 0; i < axis; i++)
+         bound *= fShapeX[i]; //bound decider
 
+      // first we create boundaries in the input
+      // [m,n,o,k,p] => boundary's size = length/(m*n*o)
+      size_t groupSize = length/bound; //final search space for topK elements
+
+      size_t jump= groupSize/fShapeX[fAttrAxis];
+      //candidates to check in group
+      size_t numOfChecksInGrp=groupSize/jump;
+      size_t numOfCheckersInGrp=groupSize/numOfChecksInGrp;
+
+      // for(int i=0;i<length;i++){
+      //    if(i==groupSize)dim=0;
       // }
       out << SP << "{\n"; // to define a separate scope for the operator code
-      out << SP << "std::vector<std::pair<float,int64_t>> elements(" << n_elements << ");\n";
-      // loop on elements before
-      if (n_before > 1) {
-         out << SP << "for (size_t i = 0; i < " << n_before << "; i++) {\n";
-         out << SP << SP << "size_t xoffset = i*" << strideX[axis-1] << ";\n";
-         out << SP << SP << "size_t yoffset = i*" << strideY[axis-1] << ";\n";
-         out << SP;
-      } else {
-         out << SP << "size_t xoffset = 0;\n";
-         out << SP << "size_t yoffset = 0;\n";
-      }
-      if (n_after > 1)
-         out << SP << "for (size_t j = 0; j < " << n_after << "; j++) {\n";
-      else
-         out << SP << "const size_t j = 0;\n";
-
-      // copy elements to be sorted in vector of pair
-      out << SP << SP << "for (size_t l = 0; l < " << n_elements << "; l++) {\n";
-      out << SP << SP << SP << "elements[l] = std::make_pair(tensor_" << fNX << "[xoffset + " << strideX[axis] << "*l + j], l);\n";
-      out << SP << SP << "}\n";
-
+      out<<SP<<"size_t itr = 0, p = 0;\n";
+      out<<SP<<"std::vector<std::vector<std::pair<float,int>>>groupElements;\n";
+      out<<SP<<"for (size_t i = 0; i < "<<length<<"; i++) {\n";
+      //main logic
+      out<<SP<<SP<<"size_t tempitr=0, j=0;\n";
+      out<<SP<<SP<<"std::vector<std::pair<float,int>>elements;\n";
+      out<<SP<<SP<<"while(tempitr < "<<groupSize<<"){\n         elements.push_back({tensor_"<<fNX<<"[i+tempitr]"<<",tempitr});\n"<<SP<<SP<<SP<<"j++;\n"<<"         tempitr = j*"<<jump<<";\n"<<"\n"<<"      }\n";
       if (fAttrSorted) {
          if (fAttrLargest) {
-            out<<SP<<SP << "std::partial_sort(elements.begin(),elements.begin()+" << fK << ",elements.end()," <<
-               "[](std::pair<float,int64_t>a,std::pair<float,int64_t>b){return (a.first!=b.first) ? (a.first>b.first) : a.second < b.second;});\n";
-
+            out<<SP<<SP << "std::sort(elements.begin(),elements.end(),[](std::pair<float,int>a,std::pair<float,int>b){return "
+                   "a.first>b.first;});\n";
          } else
-            out<<SP<<SP << "std::partial_sort(elements.begin(),elements.begin()+" << fK << ",elements.end()," <<
-            "[](std::pair<float,int64_t>a,std::pair<float,int64_t>b){return (a.first!=b.first) ? (a.first<b.first) : a.second < b.second;});\n";
+            out<<SP<<SP << "std::sort(elements.begin(),elements.end(),[](std::pair<float,int>a,std::pair<float,int>b){return "
+                   "a.first<b.first;});\n";
       } else
-         // in this case we don;t need to return sorted elements, so we keep same order as before
-         out<<SP<<SP << "std::partial_sort(elements.begin(),elements.begin()+" << fK << ",elements.end());\n";
+         out<<SP<<SP << "std::sort(elements.begin(),elements.end());\n";
 
-      // copy the selected elements in the output
-      out << SP << SP << "for (size_t l = 0; l < " << fK << "; l++) {\n";
-      out << SP << SP << SP << "tensor_" << fNVal   << "[yoffset + " << strideY[axis] << "*l + j] = elements[l].first;\n";
-      out << SP << SP << SP << "tensor_" << fNInd << "[yoffset + " << strideY[axis] << "*l + j] = elements[l].second;\n";
-      out << SP << SP << "}\n";
-      if (n_after > 1) out << SP << SP << "}\n";
-      if (n_before> 1) out << SP << "}\n";
+      out<<SP<<SP<<"itr++;\n";
+      out<<SP<<SP<<"std::vector<std::pair<float,int>>kelems;\n";
+      out<<SP<<SP<<"for (int j = 0; j < " << fK <<"; j++){\n         kelems.push_back({elements[j].first,elements[j].second});\n"<<SP<<SP<<"}\n";
+      out<<SP<<SP<<"groupElements.push_back(kelems);\n";
+      out<<SP<<SP<<"if(itr == "<<numOfCheckersInGrp<<"){\n         itr = 0;\n         i += "<<groupSize-numOfCheckersInGrp/*to compensate the default i++*/<<";\n";
+         out<<SP<<SP<<SP<<"for (size_t j = 0; j < groupElements[0].size(); j++) {\n";
+            out<<SP<<SP<<SP<<SP<<"for(size_t k = 0; k < groupElements.size(); k++) {\n";
+            out<<SP<<SP<<SP<<SP<<SP<<"tensor_"<<fNVal<<"[p] = (groupElements[k][j].first);\n";
+            out<<SP<<SP<<SP<<SP<<SP<<"tensor_"<<fNInd<<"[p++] = (groupElements[k][j].second);\n";
+            out<<SP<<SP<<SP<<SP<<"}\n";// end for
+         out<<SP<<SP<<SP<<"}\n";// end for
+         out<<SP<<SP<<SP<<"groupElements.clear();\n";
+      out<<SP<<SP<<"}\n";//end if
+      out<<SP<<"\n}\n"; // end for
       out << SP << "}\n"; // end operator scope
       return out.str();
    }

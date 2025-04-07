@@ -18,7 +18,8 @@ private:
    int fBatchSize = -1;
    long fReadPos = 0;  // reading file position
 
-   std::unordered_map<std::string, InputTensorInfo> fInputTensorInfos; // input tensors where shape may not fully defined or other graph inputs?
+   std::unordered_map<std::string, InputTensorInfo>
+      fInputTensorInfos; // input tensors where shape may not fully defined or other graph inputs?
    std::unordered_map<std::string, TensorInfo> fReadyInputTensorInfos; // input tensors where shape is full defined
    std::unordered_map<std::string, InitializedTensor> fInitializedTensors;
    std::unordered_map<std::string, TensorInfo> fIntermediateTensorInfos;
@@ -34,10 +35,6 @@ private:
    RModel * fParentGraph = nullptr;
 
    const std::string SP = "   ";
-
-   // memory pool information for intermediate tensors
-   MemoryPoolInfo fIntermediateMemoryInfo;    ///<!  intermediate memory info (transient)
-   std::unordered_map<std::string_view, size_t> fIntermediateTensorFrequencyLookup;    ///<!  lookup table for intermediate tensor frequency (transient)
 
 public:
    // Rule of five: explicitly define move semantics, disallow copy
@@ -112,13 +109,8 @@ public:
 
    // Check if a tensor is initialized
    bool IsInitializedTensor(const std::string &name) const;
-   // Check if a tensor is Constant (note a Constant tensor is also initialized)
-   bool IsConstantTensor(const std::string &name) const;
    bool IsDynamicTensor(const std::string &name) const;
-   // Check if tensor is a input dynamic tensor (without a specified shape, based on Sim structure
-   bool IsDimInputTensor(const std::string &name) const;
-   // check if tensor is a fully specified input tensor
-   bool IsReadyInputTensor(const std::string &name) const;
+   bool IsInputTensor(const std::string &name) const;
 
    // Add intermediate tensor
    void AddIntermediateTensor(std::string tensor_name, ETensorType type, std::vector<Dim> dim_shape);
@@ -146,10 +138,6 @@ public:
    // used to infer the sub-graphs
    std::string GenerateInferSignature(bool isdecl = true);
 
-   // calculate total intermediate memory and position intermediate tensor addresses
-   std::string AllocateIntermediateMemory(std::span<const std::string_view> op_output_tensors);
-   void CheckAndFlushIntermediateMemory(std::span<const std::string_view> op_output_tensors, const size_t& op_idx);
-
 protected:
    // internal functions
    // generate code for the initialized tensors
@@ -158,12 +146,7 @@ protected:
    void GenerateIntermediateTensorInfo();
    // generate code for the dynamic tensors
    void GenerateDynamicTensorInfo();
-   // generate code for declarations needed by operators
-   void GenerateOperatorDeclarations();
-   // generate code for inference
    void GenerateOutput();
-   // generate code for initializing memory pool for intermediate tensors
-   void GenerateIntermediateMemoryPool();
    // Generate all session code
    void GenerateSessionCode();
 

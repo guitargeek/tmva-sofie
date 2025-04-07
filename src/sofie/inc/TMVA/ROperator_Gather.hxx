@@ -35,20 +35,18 @@ public:
    ROperator_Gather(){}
    ROperator_Gather(int64_t attrAxis, std::string nameX, std::string nameIndices, std::string nameY):
       fAttrAxis(attrAxis), fNX(UTILITY::Clean_name(nameX)), fNIndices(UTILITY::Clean_name(nameIndices)), fNY(UTILITY::Clean_name(nameY)) {
-         fInputTensorNames = { fNX, fNIndices };
-         fOutputTensorNames = { fNY };
    }
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
       return input;
    }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
       auto ret = input;
       return ret;
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model) {
       if (!model.CheckIfTensorAlreadyExist(fNX)) {
          throw std::runtime_error("TMVA SOFIE Gather Op Input Tensor " + fNX + " is not found in model");
       }
@@ -95,11 +93,11 @@ public:
          // Copy shape of X[axis + 1, ..., axis + r) to shape of Y[axis + q, ... q + r - 1)
          std::copy(fShapeX.begin() + fAttrAxis + 1, fShapeX.end(), fShapeY.begin() + fAttrAxis + q);
       }
-      // case input is known (type is an integer) and input indices is a scalar (or vector of size 1)
-      if (model.IsInitializedTensor(fNX) && q <= 1 && r == 1 && fIndices.size() > 0) {
+      // case input is known (type is an integer) and input indices is a scalar
+      if (model.IsInitializedTensor(fNX) && q == 0 && r == 1 && fIndices.size() > 0) {
          if (model.GetTensorType(fNX) == ETensorType::INT64) {
             auto inputData = static_cast<int64_t*>(model.GetInitializedTensorData(fNX).get());
-            // if q <=1 and r = 1 output length = 1 (it is a scalar)
+            // if q =0 and r = 1 output length = 1 (it is a scalar)
             std::vector<int64_t> outputData(ConvertShapeToLength(fShapeY));
             outputData[0] = inputData[fIndices[0]];
             model.AddConstantTensor(fNY, fShapeY, outputData.data());
@@ -119,7 +117,7 @@ public:
       }
    }
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName) {
       if (fIsOutputConstant) {
          // no code to generate here for constant output. Tensor output is defined in Session constructor
          return "//---------------------------------------\n";

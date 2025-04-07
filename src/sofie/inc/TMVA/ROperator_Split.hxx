@@ -1,5 +1,5 @@
-#ifndef TMVA_SOFIE_ROPERATOR_Split
-#define TMVA_SOFIE_ROPERATOR_Split
+#ifndef TMVA_SOFIE_ROPERATOR_Swish
+#define TMVA_SOFIE_ROPERATOR_Swish
 
 #include "TMVA/SOFIE_common.hxx"
 #include "TMVA/ROperator.hxx"
@@ -11,95 +11,60 @@ namespace TMVA{
 namespace Experimental{
 namespace SOFIE{
 
-
+template <typename T>
 class ROperator_Split final : public ROperator
 {
 
 private:
 
-   int fAxis  = 0;
    std::string fNX;
-   std::string fNSplit;
+   std::string fNS;
    std::vector<std::string> fNYs;
-   std::vector<size_t> fInputShape;
-   std::vector<int64_t> fSplit;
    std::vector<std::vector<size_t>> fOutputShapes;
-
 
 
 public:
    ROperator_Split(){}
-   ROperator_Split(const std::string & nameX, const std::string & nameS,  int axis, const std::vector<std::string> &  namesY):
-      fAxis(axis), fNX(UTILITY::Clean_name(nameX)), fNSplit(UTILITY::Clean_name(nameS)) {
+   ROperator_Split(const std::string & nameX, const std::string & nameS,  const std::vector<std::string> &  namesY):
+      fNX(UTILITY::Clean_name(nameX)), fNS(UTILITY::Clean_name(nameS)){
          fNYs.reserve(namesY.size());
          for (auto & name : namesY)
             fNYs.push_back(UTILITY::Clean_name(name));
-
-         fInputTensorNames = { fNX };
-         fOutputTensorNames.resize(fNYs.size());
-         std::transform(fNYs.begin(), fNYs.end(), fOutputTensorNames.begin(),
-                   [](const std::string& s) -> std::string_view { return s; });
       }
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
       return input;
    }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
       auto ret = input; //suggest copy to compiler
       return ret;
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model){
       if (model.CheckIfTensorAlreadyExist(fNX) == false){   //input must be a graph input, or already initialized intermediate tensor
          throw std::runtime_error("TMVA SOFIE Split Op Input Tensor is not found in model");
       }
-      fInputShape = model.GetTensorShape(fNX);
+      auto inputShape = model.GetTensorShape(fNX);
 
-      // correct for negative axis
-      if (fAxis < 0) fAxis += fInputShape.size();
-      if (fAxis < 0 || fAxis >= static_cast<int>(fInputShape.size()) )
-         throw std::runtime_error("TMVA SOFIE Split - invalid axis " + std::to_string(fAxis));
+      // support now splitting only of 1D tensors and assuming tensor can be  split in equal parts
+      //int splitAxis = 0;   // assume split with zero axis
+      int nsplit = fNYs.size();
+      // support now only 1D tensor
+      if (inputShape.size() > 1)
+         throw std::runtime_error("TMVA SOFIE Split Op supports now only 1D tensors");
+      // support only equal splits
+      if (inputShape[0] % nsplit != 0)
+         throw std::runtime_error("TMVA SOFIE Split Op does not support splitting of " + ConvertShapeToString(inputShape)
+            + " into " + std::to_string(nsplit));
 
-      // compute output shapes
-      size_t nsplit = fNYs.size();
-      // case split tensor is empty
-      if (fNSplit.empty()) {
-         int64_t splitValue = 0;
-         if (fInputShape[fAxis] % nsplit == 0) {
-            splitValue = fInputShape[fAxis]/nsplit;
-            fSplit = std::vector<int64_t>(nsplit, splitValue);
-         } else {
-            // case of not equal splitting
-            splitValue = std::ceil(double(fInputShape[fAxis])/nsplit);
-            fSplit = std::vector<int64_t>(nsplit-1, splitValue);
-            fSplit.push_back(fInputShape[fAxis] % splitValue);
-         }
-      } else {
-         // get split tensor values
-         if (!model.IsInitializedTensor(fNSplit))
-            throw std::runtime_error("TMVA SOFIE Split - non-initialized split tensors are not supported");
-         auto splitShape =  model.GetTensorShape(fNSplit);
-         if (splitShape.size() != 1 || splitShape[0] != nsplit)
-            throw std::runtime_error("TMVA SOFIE Split - split input tensor has invalid shape");
-         auto split_data = static_cast<int64_t *>(model.GetInitializedTensorData(fNSplit).get());
-         fSplit = std::vector<int64_t>(split_data, split_data + nsplit);
-      }
-      // compute now the output shapes
-      size_t tot_split = 0;
       for (size_t i = 0; i < fNYs.size(); i++) {
-         std::vector<size_t> outputShape = fInputShape;
-         outputShape[fAxis] = fSplit[i];
-         tot_split += fSplit[i];
+         std::vector<size_t> outputShape = { inputShape[0]/nsplit };
          model.AddIntermediateTensor(fNYs[i], model.GetTensorType(fNX), outputShape);
-         fOutputShapes.push_back(outputShape);
+         fOutputShapes.push_back(outputShape);  // need for generating code
       }
-      if (tot_split != fInputShape[fAxis])
-         throw std::runtime_error("TMVA SOFIE Split - Sum of split sizes must match the input dimension along the axis");
-
-
       if (model.Verbose()) {
-         std::cout << "Split - input shape " << ConvertShapeToString(fInputShape) << " --> ";
+         std::cout << "Split - input shape " << ConvertShapeToString(inputShape) << " --> ";
          for (auto & s : fOutputShapes)
             std::cout << ConvertShapeToString(s) << "  ";
          std::cout << std::endl;
@@ -107,49 +72,20 @@ public:
    }
 
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName){
       OpName = "op_" + OpName;
       if (fOutputShapes.empty()){
          throw std::runtime_error("TMVA SOFIE Operator Split called to Generate without being initialized first");
       }
-
-      auto input_strides =  UTILITY::ComputeStrideFromShape(fInputShape);
-
-      // generate now the code for split
       std::stringstream out;
-      out << "\n" << SP << "//------ Split\n";
-      out << SP << "size_t " << OpName << "_axis_offset = 0;\n";
-      // unroll the loop on split outputs
+      out << "\n//------ Split\n";
+      out << "size_t offset = 0;\n";
       for (size_t i = 0; i < fNYs.size(); i++)  {
-         size_t length = ConvertShapeToLength(fOutputShapes[i]);
-         auto output_strides = UTILITY::ComputeStrideFromShape(fOutputShapes[i]);
-
+         int length = ConvertShapeToLength(fOutputShapes[i]);
          out << SP << "for (int id = 0; id < " << length << " ; id++){\n";
-         // convert output index to input index
-         out << SP << SP << "int input_index = 0;\n";
-         out << SP << SP << "int remaining = id;\n";
-         // loop on dimensions to compute the input indices(unroll this loop)
-         for (size_t k = 0; k < fOutputShapes[i].size(); ++k) {
-            out << SP << SP << "// dim " << k << "\n";
-            if (k < fOutputShapes[i].size()-1) {
-               out << SP << SP << "input_index += (int(remaining / " << output_strides[k] << ")";
-               // for the split axis we need to consider the offset in the splits when converting to input coordinates
-               if (k == static_cast<size_t>(fAxis) && i > 0)
-                  out << " + " << OpName << "_axis_offset";
-               out << ") * " << input_strides[k] << ";\n";
-               out << SP << SP  << "remaining %= " << output_strides[k] << ";\n";
-            } else {
-               // for last dims all strides are one
-               out << SP << SP << "input_index += remaining";
-               if (k == static_cast<size_t>(fAxis) && i > 0)
-                  out << " + " << OpName << "_axis_offset";
-               out << ";\n\n";
-            }
-         }
-
-         out << SP << SP  << "tensor_" << fNYs[i] << "[id] = tensor_" << fNX <<"[input_index];\n";
+            out << SP << SP  << "tensor_" << fNYs[i] << "[id] = tensor_" << fNX <<"[offset+id];\n";
          out << SP << "}\n";
-         if (i < fNYs.size()-1) out << SP << OpName << "_axis_offset += " << fSplit[i] << ";\n";
+         if (i < fNYs.size()-1) out << SP << "offset += " << length << ";\n";
       }
       return out.str();
    }

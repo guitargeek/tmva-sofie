@@ -48,22 +48,15 @@ public:
    ROperator_Reduce(int keepdims, std::vector<int64_t> attrAxes, std::string nameX, std::string nameAxes, std::string nameY):
    fkeepdims(keepdims), fAttrAxes(attrAxes), fNX(UTILITY::Clean_name(nameX)), fNAxes(UTILITY::Clean_name(nameAxes)), fNY(UTILITY::Clean_name(nameY)) {
       fReduceOpMode = Op;
-      
-      fInputTensorNames = { fNX };
-      if(!fNAxes.empty()){
-         fInputTensorNames.emplace_back(fNAxes);
-      }
-
-      fOutputTensorNames = { fNY };
    }
 
    // type of output given input
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
       return input;
    }
 
    // shape of output tensors given input tensors
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
       auto ret = input; //suggest copy to compiler
       auto & outputShape = ret[0];
       for (size_t j = 0; j < fAttrAxes.size(); j++) {
@@ -89,7 +82,7 @@ public:
       }
       return ret;
    }
-   void Initialize(RModel& model) override {
+   void Initialize(RModel &model) {
 
       fUseSession = model.UseSession();
 
@@ -117,10 +110,9 @@ public:
       if (model.Verbose()){
          std::cout << Name() << " : " << fNX << " -> " << fNY << " shape " << ConvertShapeToString(fShapeY) << std::endl;
       }
-      model.AddNeededStdLib("algorithm");
    }
 
-   std::string Generate(std::string opName) override {
+   std::string Generate(std::string opName){
       opName = "op_" + opName;
       if (fShapeX.empty() || fShapeY.empty()) {
          throw std::runtime_error("TMVA SOFIE Reduce Op called to Generate without being initialized first");
@@ -196,9 +188,9 @@ public:
          // case reduction is at beginning
          // reset output tensors
          if (fReduceOpMode == ReduceProd)
-            out << SP << "std::fill(tensor_" << fNY <<", tensor_"<< fNY <<" + "<< outputLength << ", 1);\n";
+            out << SP << "fTensor_" << fNY << ".assign(" << outputLength << ",1);\n";
          else
-            out << SP << "std::fill(tensor_" << fNY <<", tensor_"<< fNY <<" + "<< outputLength << ", 0);\n";
+            out << SP << "fTensor_" << fNY << ".assign(" << outputLength << ",0);\n";
 
          out << SP << "for (size_t i = 0; i < " << reducedLength << "; i++) {\n";
          out << SP << SP << "for (size_t j = 0; j < " << outputLength << "; j++) {\n";
@@ -223,9 +215,9 @@ public:
          //std::cout << "reduction for operator " << opName << " is middle" << std::endl;
          // reset output tensors
          if (fReduceOpMode == ReduceProd)
-            out << SP << "std::fill(tensor_" << fNY <<", tensor_"<< fNY <<" + "<< outputLength << ", 1);\n";
+            out << SP << "fTensor_" << fNY << ".assign(" << outputLength << ",1);\n";
          else
-            out << SP << "std::fill(tensor_" << fNY <<", tensor_"<< fNY <<" + "<< outputLength << ",0);\n";
+            out << SP << "fTensor_" << fNY << ".assign(" << outputLength << ",0);\n";
 
          out << SP << "for (size_t i = 0; i < " << inputLength << "; i++) {\n";
 

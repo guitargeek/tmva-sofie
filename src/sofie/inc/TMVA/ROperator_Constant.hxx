@@ -33,21 +33,18 @@ public:
       fShape(shape),
       fValues(values),
       fAttrType(type)
-      {
-         fInputTensorNames = { };
-         fOutputTensorNames = { };
-      }
+      { }
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
       return input;
    }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
       auto ret = input; //suggest copy to compiler
       return ret;
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model){
        //input must be a graph input, or already initialized intermediate tensor
       size_t length = 1;
       if (!fNX.empty()) {
@@ -99,7 +96,7 @@ public:
       }
    }
 
-   std::string Generate(std::string /* OpName */) override {
+   std::string Generate(std::string /* OpName */){
       // no code to generate here. Tensor are defined in Session constructor
       return "//---------------------------------------\n";
    }

@@ -26,21 +26,18 @@ public:
    ROperator_Cast(){}
    ROperator_Cast(std::string attr_type,std::string nameX, std::string nameY):
    fNX(UTILITY::Clean_name(nameX)), fNY(UTILITY::Clean_name(nameY)),
-   fAttrType(attr_type) {
-      fInputTensorNames = { fNX };
-      fOutputTensorNames = { fNY };
-   }
+   fAttrType(attr_type) {}
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
       return input;
    }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
       auto ret = input; //suggest copy to compiler
       return ret;
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model){
        //input must be a graph input, or already initialized intermediate tensor
       if (model.CheckIfTensorAlreadyExist(fNX) == false){
         throw std::runtime_error("TMVA SOFIE Cast Op Input Tensor is not found in model");
@@ -68,7 +65,7 @@ public:
    }
 
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName){
       if (fIsOutputConstant) return "";
 
       OpName = "op_" + OpName;

@@ -40,9 +40,6 @@ private:
    std::string fNBroadcastedB;
    std::string fNY;
 
-   std::string fConvK;
-   std::string fImcol;
-
    std::vector<size_t> fShapeX;
    std::vector<size_t> fShapeW;
    std::vector<size_t> fShapeB;
@@ -80,12 +77,6 @@ public:
         fNX(UTILITY::Clean_name(nameX)), fNW(UTILITY::Clean_name(nameW)), fNB(UTILITY::Clean_name(nameB)),
         fNY(UTILITY::Clean_name(nameY))
    {
-      fInputTensorNames = { fNX, fNW };
-      fOutputTensorNames = { fNY };
-      if (!fNB.empty()) {
-         fInputTensorNames.emplace_back(fNB);
-      }
-
       if (std::is_same<T, float>::value) {
          fType = "float";
       } else {
@@ -110,11 +101,16 @@ public:
    /*! \brief Initialize the model
     * \param model Model
     */
-   void Initialize(RModel &) override;
+   void Initialize(RModel & /*model*/) override;
 
    /*! \brief Generate code for initializing the op
     */
    std::string GenerateInitCode() override;
+
+   /*! \brief Generate code for Session data members (e.g. internal vectors)
+    * \param opName name of the operator
+    */
+   std::string GenerateSessionMembersCode(std::string /*opName*/) override;
 
    /*! \brief Generate the inference code
     * \param opName name of the operator

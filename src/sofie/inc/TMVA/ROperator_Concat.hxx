@@ -33,19 +33,14 @@
             fInputs.reserve(inputs.size());
             for (auto & name : inputs)
                fInputs.push_back(UTILITY::Clean_name(name));
-
-         fInputTensorNames.resize(fInputs.size());
-         std::transform(fInputs.begin(), fInputs.end(), fInputTensorNames.begin(),
-                   [](const std::string& s) -> std::string_view { return s; });
-         fOutputTensorNames = { fOutput };
          }
 
-         std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+         std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
              return input;
          }
 
          // get shape of output given inputs. It is going to be called after initialized
-         std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> inputs) override {
+         std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> inputs){
              std::vector<std::vector<size_t>> ret(1);
             // treat negative axis case
             if (fAxis<0) {
@@ -98,7 +93,7 @@
          }
 
          // get shape of output given inputs. It is going to be called after initialized
-         std::vector<std::vector<Dim>> ShapeInference(const std::vector<std::vector<Dim>> & inputs) {
+         std::vector<std::vector<Dim>> ShapeInference(const std::vector<std::vector<Dim>> & inputs){
             std::vector<std::vector<Dim>> ret(1);
             // treat negative axis case
             if (fAxis<0) {
@@ -143,7 +138,8 @@
             return ret;
          }
 
-      void Initialize(RModel& model) override {
+         void Initialize(RModel &model)
+         {
             for (auto &it : fInputs) {
                if (model.CheckIfTensorAlreadyExist(it) == false) {
                   throw std::runtime_error("TMVA SOFIE Concat Op Input Tensor " + it + " is not found in model");
@@ -191,7 +187,7 @@
             }
          }
 
-         std::string Generate(std::string OpName) override {
+         std::string Generate(std::string OpName){
             if (fIsOutputConstant) return "";
             OpName = "op_"+OpName;
             if(fOutputShape.empty()){

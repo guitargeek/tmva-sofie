@@ -109,34 +109,6 @@ template <typename T> class ROperator_LSTM final : public ROperator {
          throw std::runtime_error(
              "TMVA SOFIE Encountered unsupported type parsing a LSTM operator");
       }
-      
-      fInputTensorNames = { fNX, fNW, fNR };
-      if (!fNB.empty()){
-         fInputTensorNames.emplace_back(fNB);
-      }
-      if (!fNSequence_lens.empty()){
-         fInputTensorNames.emplace_back(fNSequence_lens);
-      }
-      if (!fNInitial_h.empty()){
-         fInputTensorNames.emplace_back(fNInitial_h);
-      }
-      if (!fNInitial_c.empty()){
-         fInputTensorNames.emplace_back(fNInitial_c);
-      }
-      if (!fNP.empty()){
-         fInputTensorNames.emplace_back(fNP);
-      }
-
-      fOutputTensorNames = { };
-      if (!fNY.empty()){
-         fOutputTensorNames.emplace_back(fNY);
-      }
-      if (!fNY_h.empty()){
-         fOutputTensorNames.emplace_back(fNY_h);
-      }
-      if (!fNY_c.empty()){
-         fOutputTensorNames.emplace_back(fNY_c);
-      }
    }
 
    /*! \brief Infers the type of the output tensors
@@ -156,7 +128,7 @@ template <typename T> class ROperator_LSTM final : public ROperator {
     *
     * \param model Model
     */
-   void Initialize(RModel &);
+   void Initialize(RModel &model);
 
    /*! \brief Generate the inference code
     *

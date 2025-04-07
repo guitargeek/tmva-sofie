@@ -51,12 +51,6 @@ set(sources_headers
    TMVA/ROperator_TopK.hxx
    TMVA/ROperator_Tile.hxx
    TMVA/ROperator_Split.hxx
-   TMVA/ROperator_SubGraph.hxx
-   TMVA/ROperator_Pad.hxx
-   TMVA/ROperator_Where.hxx
-   TMVA/ROperator_Einsum.hxx
-   TMVA/ROperator_Random.hxx
-   TMVA/ROperator_ScatterElements.hxx
    TMVA/SOFIE_common.hxx
    TMVA/SOFIEHelpers.hxx
 

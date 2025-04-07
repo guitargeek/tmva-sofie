@@ -300,29 +300,6 @@
 #include "Tile5D_FromONNX.hxx"
 #include "input_models/references/Tile5D.ref.hxx"
 
-#include "Pad_FromONNX.hxx"
-
-#include "Where_FromONNX.hxx"
-
-#include "Sin_FromONNX.hxx"
-
-#include "Cos_FromONNX.hxx"
-#include "Abs_FromONNX.hxx"
-
-#include "Einsum_matmul_FromONNX.hxx"
-#include "Einsum_dotprod_FromONNX.hxx"
-#include "Einsum_3_FromONNX.hxx"
-#include "Einsum_4_FromONNX.hxx"
-
-#include "RandomUniform_FromONNX.hxx"
-#include "RandomNormal_FromONNX.hxx"
-
-#include "Split_0_FromONNX.hxx"
-#include "Split_1_FromONNX.hxx"
-#include "Split_2_FromONNX.hxx"
-
-#include "ScatterElements_FromONNX.hxx"
-
 #include "gtest/gtest.h"
 
 constexpr float DEFAULT_TOLERANCE = 1e-3f;
@@ -567,19 +544,16 @@ TEST(ONNX, ComplexTopK)
    constexpr float TOLERANCE = DEFAULT_TOLERANCE;
 
    // Preparing the standard all-ones input
-   std::vector<float> input({
-        9.0000, 8.0000, 4.5000, 1.7000, 2.9000, 3.2000, 4.0000, 2.6000, 7.4000,
+   std::vector<float> input({9.0000, 8.0000, 4.5000, 1.7000, 2.9000, 3.2000, 4.0000, 2.6000, 7.4000,
         3.5000, 5.6000, 7.1000, 9.8000, 1.1000, 3.3000, 6.2000, 8.4000, 0.7000,
         2.2000, 3.3000, 4.4000, 5.5000, 6.6000, 7.7000, 8.8000, 9.9000, 1.0000,
-
         1.0000, 2.0000, 3.0000, 4.0000, 5.0000, 6.0000, 7.0000, 8.0000, 9.0000,
         9.0000, 8.0000, 7.0000, 6.0000, 5.0000, 4.0000, 3.0000, 2.0000, 1.0000,
-        5.0000, 4.0000, 3.0000, 2.0000, 1.0000, 6.0000, 7.0000, 8.0000, 9.0000 });
-
+        5.0000, 4.0000, 3.0000, 2.0000, 1.0000, 6.0000, 7.0000, 8.0000, 9.0000});
    TMVA_SOFIE_ComplexTopK::Session s("ComplexTopK_FromONNX.dat");
-   auto output = s.infer(input.data());
-   std::vector<float> values = std::get<0>(output);
-   std::vector<int64_t> indexes = std::get<1>(output);
+   std::vector<std::vector<float>> output = s.infer(input.data());
+   std::vector<float> values = output[0];
+   std::vector<float> indexes = output[1];
 
    // Checking output size..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
    std::cout<<values.size()<<" "<<sizeof(ComplexTopK_ExpectedOutput::values) / sizeof(float)<<std::endl;
@@ -589,7 +563,7 @@ TEST(ONNX, ComplexTopK)
 float *correct_values = ComplexTopK_ExpectedOutput::values;
 
 // Checking every output value, one by one
-for (size_t i = 0; i < values.size(); ++i) {
+for (size_t i = 0; i < output.size(); ++i) {
     std::cout << "Output[" << i << "]: " << values[i] << ", Correct[" << i << "]: " << correct_values[i] << std::endl;
     EXPECT_LE(std::abs(values[i] - correct_values[i]), TOLERANCE);
 }
@@ -601,7 +575,7 @@ EXPECT_EQ(indexes.size(), sizeof(ComplexTopK_ExpectedOutput::indexes) / sizeof(f
 float *correct_indexes = ComplexTopK_ExpectedOutput::indexes;
 
 // Checking every output value, one by one
-for (size_t i = 0; i < indexes.size(); ++i) {
+for (size_t i = 0; i < output.size(); ++i) {
     std::cout << "Indexes[" << i << "]: " << indexes[i] << ", Correct[" << i << "]: " << correct_indexes[i] << std::endl;
     EXPECT_LE(std::abs(indexes[i] - correct_indexes[i]), TOLERANCE);
 }
@@ -612,11 +586,11 @@ TEST(ONNX, TopK)
    constexpr float TOLERANCE = DEFAULT_TOLERANCE;
 
    // Preparing the standard all-ones input
-   std::vector<float> input({9.0, 8.0, 4.5, 1.7, 2.9, 3.2, 4, 2.6, 7.4});
+   std::vector<float> input({9.0, 8.0, 4.5, 1.7, 2.9, 3.2, 4, 2.6, 7.});
    TMVA_SOFIE_TopK::Session s("TopK_FromONNX.dat");
-   auto output = s.infer(input.data());
-   std::vector<float> values = std::get<0>(output);
-   std::vector<int64_t> indexes = std::get<1>(output);
+   std::vector<std::vector<float>> output = s.infer(input.data());
+   std::vector<float> values = output[0];
+   std::vector<float> indexes = output[1];
 
    // Checking output size
    std::cout<<values.size()<<" "<<sizeof(TopK_ExpectedOutput::values) / sizeof(float)<<std::endl;
@@ -625,7 +599,7 @@ TEST(ONNX, TopK)
    float *correct_values = TopK_ExpectedOutput::values;
 
    // Checking every output value, one by one
-   for (size_t i = 0; i < values.size(); ++i) {
+   for (size_t i = 0; i < output.size(); ++i) {
       std::cout << "Output[" << i << "]: " << values[i] << ", Correct[" << i << "]: " << correct_values[i] << std::endl;
       EXPECT_LE(std::abs(values[i] - correct_values[i]), TOLERANCE);
    }
@@ -636,7 +610,7 @@ TEST(ONNX, TopK)
    float *correct_indexes= TopK_ExpectedOutput::indexes;
 
    // Checking every output value, one by one
-   for (size_t i = 0; i < indexes.size(); ++i) {
+   for (size_t i = 0; i < output.size(); ++i) {
       std::cout << "Indexes[" << i << "]: " << indexes[i] << ", Correct[" << i << "]: " << correct_indexes[i] << std::endl;
       EXPECT_LE(std::abs(indexes[i] - correct_indexes[i]), TOLERANCE);
    }
@@ -1371,19 +1345,19 @@ TEST(ONNX, SumMultidirectionalBroadcast) {
 }
 
 TEST(ONNX, Shape){
-   // test of Shape. Use shape operator to get shape and create a tensor equal to input shape and multiply the two
-   // Avoid test directly Shape otherwise get a compilation warning for the input that is not used in infer function
    constexpr float TOLERANCE = DEFAULT_TOLERANCE;
 
-   // Preparing the input ( a tensor of shape [1,2,3])
-   std::vector<float> input( {1,2,3,4,5,6} );
+   // Preparing the standard  input
+   std::vector<float> input({
+      1, 2
+   });
 
    TMVA_SOFIE_Shape::Session s("Shape_FromONNX.dat");
    auto output = s.infer(input.data());
    // Checking output size
    EXPECT_EQ(output.size(), sizeof(Shape_ExpectedOutput::outputs) / sizeof(float));
 
-   float *correct = Shape_ExpectedOutput::outputs;
+   int *correct = Shape_ExpectedOutput::outputs;
 
    // Checking every output value, one by one
    for (size_t i = 0; i < output.size(); ++i) {
@@ -2924,293 +2898,4 @@ TEST(ONNX, Tile5D) {
       for (size_t i = 0; i < output.size(); ++i) {
          EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
       }
-}
-TEST(ONNX, Pad) {
-   // add constant pad values of zeros
-   // input tensor [1,2,2] and pad in (1,0),(0,1),(2,1) -> with shape (2,3,5)
-   std::vector<float> input = {1,2,3,4};
-   std::vector<float> correct = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 3,
-       4, 0, 0, 0, 0, 0, 0, 0};
-   TMVA_SOFIE_Pad::Session s("Pad_FromONNX.dat");
-   std::vector<float> output(s.infer(input.data()));
-
-   // Checking the output size
-   EXPECT_EQ(output.size(), correct.size());
-
-   // Checking every output value, one by one
-   for (size_t i = 0; i < output.size(); i++) {
-      EXPECT_EQ(output[i], correct[i]);
-   }
-}
-TEST(ONNX, Where) {
-   // test of Where using [[1,2]] and [[3,4],[5,6],[7,8]] with condition [[true],[false],[true]] -> [[1,2],[5,6],[1,2]]
-   // test also the broadcast of boolean tensors
-   std::vector<float> input1 = {1,2};
-   std::vector<float> input2 = {3,4,5,6};
-   bool cond[] = {true, false, true}; // need to pass arrays for booleans
-   std::vector<float> correct = {1,2,5,6,1,2};
-   TMVA_SOFIE_Where::Session s("Where_FromONNX.dat");
-   std::vector<float> output(s.infer(input1.data(), input2.data(), cond));
-
-   // Checking the output size
-   EXPECT_EQ(output.size(), correct.size());
-
-   // Checking every output value, one by one
-   for (size_t i = 0; i < output.size(); i++) {
-      EXPECT_EQ(output[i], correct[i]);
-   }
-}
-
-TEST(ONNX, Sin)
-{
-   constexpr float TOLERANCE = DEFAULT_TOLERANCE;
-
-   // Preparing some random input
-   std::vector<float> input({
-     -0.786738,-0.197796,-0.187787,0.142758,0.876096,-0.653239,0.145444,-1.107658,2.259171,-0.947054,-0.506689,1.801250
-   });
-
-   TMVA_SOFIE_Sin::Session s("Sin_FromONNX.dat");
-
-   std::vector<float> output = s.infer(input.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), input.size());
-
-   // Checking every output value, one by one
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_LE(std::abs(output[i] - std::sin(input[i])), TOLERANCE);
-   }
-}
-
-TEST(ONNX, Cos)
-{
-   constexpr float TOLERANCE = DEFAULT_TOLERANCE;
-
-   // Preparing the random input
-   std::vector<float> input({
-     1.152504,-1.459324,0.691594,0.347690,-1.307323,1.832516,-1.261772,0.014224,1.311477,1.147405,-0.567206,-0.530606
-   });
-
-   TMVA_SOFIE_Cos::Session s("Cos_FromONNX.dat");
-
-   std::vector<float> output = s.infer(input.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), input.size());
-
-   // Checking every output value, one by one
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_LE(std::abs(output[i] - std::cos(input[i])), TOLERANCE);
-   }
-}
-
-TEST(ONNX, Abs)
-{
-   constexpr float TOLERANCE = DEFAULT_TOLERANCE;
-
-   // Preparing the random input
-   std::vector<float> input({1.,-2.,-3,4,-5.,6});
-
-   TMVA_SOFIE_Abs::Session s("Abs_FromONNX.dat");
-
-   std::vector<float> output = s.infer(input.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), input.size());
-
-   // Checking every output value, one by one
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_LE(std::abs(output[i] - std::abs(input[i])), TOLERANCE);
-   }
-}
-// tests of Einsum operator
-TEST(ONNX, Einsum_matmul)
-{
-   std::vector<float> input1{1, 2, 3, 4};
-   std::vector<float> input2{5, 6, 7, 8};
-   std::vector<float> correct_output = {19, 22, 43, 50};
-
-   TMVA_SOFIE_Einsum_matmul::Session s("Einsum_matmul_FromONNX.dat");
-
-   std::vector<float> output = s.infer(input1.data(), input2.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), 4);
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_EQ(output[i], correct_output[i]);
-   }
-}
-// test dot prod using Einsum
-TEST(ONNX, Einsum_dotprod)
-{
-   std::vector<float> input1{1, 2, 3};
-   std::vector<float> input2{5, 6, 7};
-   std::vector<float> correct_output {5 +  12 + 21};
-
-   TMVA_SOFIE_Einsum_dotprod::Session s("Einsum_dotprod_FromONNX.dat");
-
-   std::vector<float> output = s.infer(input1.data(), input2.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), 1);
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_EQ(output[i], correct_output[i]);
-   }
-}
-// test tensor contraction of rank 3 tensors
-TEST(ONNX, Einsum_3)
-{
-   // test abc,abd->ad   [2,2,3] , [2,2,3] -> [2,3]
-   std::vector<float> input1 {1.,2.,3,4,5,6,7,8,9,10,11,12};
-   std::vector<float> input2 {1.,2.,3,4,5,6,7,8,9,10,11,12};
-   std::vector<float> correct_output {66. , 87. , 108., 498.,  555., 612. };
-
-
-   TMVA_SOFIE_Einsum_3::Session s("Einsum_dotprod_FromONNX.dat");
-
-   std::vector<float> output = s.infer(input1.data(), input2.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), 6);
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_EQ(output[i], correct_output[i]);
-   }
-}
-// test tensor contraction of rank 4 tensors
-TEST(ONNX, Einsum_4)
-{
-   // test abcd,abed->abce  [2,1,2,3] , [2,1,3,3] -> [2,1,2,3]
-   std::vector<float> input1 {1.,2.,3,4,5,6,7,8,9,10,11,12};
-   std::vector<float> input2 {1.,2.,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
-   std::vector<float> correct_output { 14., 32.,  50., 32.,  77.,  122.,
-                                      266., 338., 410., 365., 464., 563. };
-
-
-   TMVA_SOFIE_Einsum_4::Session s("Einsum_4_FromONNX.dat");
-
-   std::vector<float> output = s.infer(input1.data(), input2.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), 12);
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_EQ(output[i], correct_output[i]);
-   }
-}
-TEST(ONNX, RandomUniform)
-{
-   // output of gRandom->Uniform(10,20) with seed 111 - > shape(2,3)
-   std::vector<float> correct_output = {16.1217, 11.2076, 11.6907, 13.0179, 14.3606, 18.5391};
-
-   TMVA_SOFIE_RandomUniform::Session s("RandomUniform_FromONNX.dat");
-
-   std::vector<float> output = s.infer();
-
-   // Checking output size
-   EXPECT_EQ(output.size(), correct_output.size());
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_LE(std::abs(output[i] - correct_output[i]), DEFAULT_TOLERANCE);
-   }
-}
-
-TEST(ONNX, RandomNormal)
-{
-    // output of gRandom->Gaus(1,3) with seed 111 - > shape(2,3)
-   std::vector<float> correct_output = {-0.808389, -0.985581, 0.616354, 2.1887, 1.13927, -0.228048};
-
-   TMVA_SOFIE_RandomNormal::Session s("RandomNormal_FromONNX.dat");
-
-   std::vector<float> output = s.infer();
-
-   // Checking output size
-   EXPECT_EQ(output.size(), correct_output.size());
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_LE(std::abs(output[i] - correct_output[i]), DEFAULT_TOLERANCE);
-   }
-}
-
-TEST(ONNX, Split_0)
-{
-   // split in axis 0  in 2 tensor {2,2,3}
-   std::vector<float> input {1.,2.,3,4,5,6,7,8,9,10,11,12};
-   std::vector<std::vector<float>> correct_output ={ {1,2,3,4,5,6}, {7,8,9,10,11,12} };
-
-   TMVA_SOFIE_Split_0::Session s("Split_0_FromONNX.dat");
-
-   auto output = s.infer(input.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), correct_output.size());
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      for (size_t j = 0; j < output[i].size(); ++j) {
-         EXPECT_LE(std::abs(output[i][j] - correct_output[i][j]), DEFAULT_TOLERANCE);
-      }
-   }
-}
-
-TEST(ONNX, Split_1)
-{
-   // split in axis 1  in 2 tensor {2,2,3}
-   std::vector<float> input {1.,2.,3,4,5,6,7,8,9,10,11,12};
-   std::vector<std::vector<float>> correct_output ={ {1,2,3,7,8,9}, {4,5,6,10,11,12} };
-
-   TMVA_SOFIE_Split_1::Session s("Split_1_FromONNX.dat");
-
-   auto output = s.infer(input.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), correct_output.size());
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      for (size_t j = 0; j < output[i].size(); ++j) {
-         EXPECT_LE(std::abs(output[i][j] - correct_output[i][j]), DEFAULT_TOLERANCE);
-      }
-   }
-}
-
-TEST(ONNX, Split_2)
-{
-   // split in axis 2  in 2 tensor {2,2,3} -> { 2,2,2} and {2,2,1}
-   std::vector<float> input {1.,2.,3,4,5,6,7,8,9,10,11,12};
-   std::vector<std::vector<float>> correct_output ={ {1,2,4,5,7,8,10,11}, {3,6,9,12} };
-
-   TMVA_SOFIE_Split_2::Session s("Split_2_FromONNX.dat");
-
-   auto output = s.infer(input.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), correct_output.size());
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      for (size_t j = 0; j < output[i].size(); ++j) {
-         EXPECT_LE(std::abs(output[i][j] - correct_output[i][j]), DEFAULT_TOLERANCE);
-      }
-   }
-}
-
-TEST(ONNX, ScatterElements)
-{
-   // test scatter elements (similar test as in ONNX doc)
-   std::vector<float> input(9, 0.);    // input tensor shape is (3.3)
-   std::vector<int64_t> indices = { 1, 0, 2, 0, 2, 1};
-   std::vector<float> updates = { 1, 1.1, 1.2, 2, 2.1, 2.2};
-   std::vector<float> correct_output = {2, 1.1, 0., 1., 0., 2.2, 0., 2.1, 1.2 };
-
-   TMVA_SOFIE_ScatterElements::Session s("ScatterElements_FromONNX.dat");
-
-   auto output = s.infer(input.data(), indices.data(), updates.data());
-
-   // Checking output size
-   EXPECT_EQ(output.size(), correct_output.size());
-   // Checking output
-   for (size_t i = 0; i < output.size(); ++i) {
-      EXPECT_LE(std::abs(output[i] - correct_output[i]), DEFAULT_TOLERANCE);
-   }
 }

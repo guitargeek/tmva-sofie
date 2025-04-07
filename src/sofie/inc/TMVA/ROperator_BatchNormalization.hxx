@@ -30,7 +30,6 @@ private:
    std::string fNMean;
    std::string fNVar;
    std::string fNY;
-   EActivationType fActivation;
 
    std::vector<size_t> fShapeX;
    std::vector<size_t> fShapeScale;
@@ -47,15 +46,12 @@ public:
    /* Constructor */
    ROperator_BatchNormalization( float epsilon, float momentum, std::size_t training_mode,
    std::string nameX, std::string nameScale, std::string nameB,
-   std::string nameMean, std::string nameVar, std::string nameY, EActivationType activation=EActivationType::UNDEFINED):
+   std::string nameMean, std::string nameVar, std::string nameY):
    fepsilon(epsilon), fmomentum(momentum), ftraining_mode(training_mode),
    fNX(UTILITY::Clean_name(nameX)), fNScale(UTILITY::Clean_name(nameScale)),
    fNB(UTILITY::Clean_name(nameB)), fNMean(UTILITY::Clean_name(nameMean)),
-   fNVar(UTILITY::Clean_name(nameVar)), fNY(UTILITY::Clean_name(nameY)), fActivation(activation)
+   fNVar(UTILITY::Clean_name(nameVar)), fNY(UTILITY::Clean_name(nameY))
    {
-      fInputTensorNames = { fNX };
-      fOutputTensorNames = { fNY };
-
       if(std::is_same<T, float>::value){
       fType = "float";
       }
@@ -66,12 +62,12 @@ public:
    }
 
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) {
       ETensorType out = input[0];
       return {out};
    }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) {
       if (input.size() != 5 ) {
          throw
          std::runtime_error("TMVA SOFIE BatchNormalization Op Shape inference need 5 input tensors");
@@ -87,7 +83,7 @@ public:
       return ret;
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model){
       if (!model.CheckIfTensorAlreadyExist(fNX)) {
          throw
             std::runtime_error("TMVA SOFIE BatchNormalization op Input Tensor " + fNX + " fnx is not found in model");
@@ -184,7 +180,7 @@ public:
       }
    }
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName){
       OpName = "op_" + OpName;
       if (fShapeX.empty()){
          throw std::runtime_error("TMVA SOFIE Batch Normalization called to Generate without being initialized first");
@@ -199,7 +195,6 @@ public:
       size_t n = batchSize * channels * height * width;
 
       //// copy X into Y
-      out << "\n\n//---- BatchNorm\n";
       out << SP << "constexpr int " << OpName << "_N =" << batchSize * channels * height * width << ";\n";
       out << SP << "constexpr int "<<OpName<< "_incx = 1;\n";
       out << SP << "constexpr int "<<OpName<< "_incy = 1;\n";
@@ -221,15 +216,10 @@ public:
       out << SP << "BLAS::saxpy_(&" << OpName << "_N, &" << OpName << "_alpha, " << "tensor_" << fNB << ", &" << OpName << "_incx, "
          << "tensor_" << fNY << ", &" << OpName << "_incy);\n\n";
 
-      if(fActivation == EActivationType::RELU){
-         out << SP << "for (int id = 0; id < " << ConvertShapeToLength(fShapeY) << " ; id++){\n";
-         out << SP << SP << "tensor_" << fNY << "[id] = ((tensor_" << fNY << "[id] > 0 )? tensor_" << fNY << "[id] : 0);\n";
-         out << SP << "}\n";
-      }
       return out.str();
    }
 
-   std::vector<std::string> GetBlasRoutines() override { return { std::string("Copy"), std::string("Axpy") }; }
+   std::vector<std::string> GetBlasRoutines() { return { std::string("Copy"), std::string("Axpy") }; }
 };
 
 }//SOFIE

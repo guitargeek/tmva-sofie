@@ -25,21 +25,18 @@ private:
 public:
    ROperator_EyeLike(){}
    ROperator_EyeLike(int dtype, int k, std::string nameX, std::string nameY):
-      fdtype(dtype), fk(k), fNX(UTILITY::Clean_name(nameX)), fNY(UTILITY::Clean_name(nameY)){
-         fInputTensorNames = { fNX };
-         fOutputTensorNames = { fNY };
-      }
+      fdtype(dtype), fk(k), fNX(UTILITY::Clean_name(nameX)), fNY(UTILITY::Clean_name(nameY)){}
 
-   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
+   std::vector<ETensorType> TypeInference(std::vector<ETensorType> input){
       return input;
    }
 
-   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input) override {
+   std::vector<std::vector<size_t>> ShapeInference(std::vector<std::vector<size_t>> input){
       auto ret = input; //suggest copy to compiler
       return ret;
    }
 
-   void Initialize(RModel& model) override {
+   void Initialize(RModel& model){
       if (model.CheckIfTensorAlreadyExist(fNX) == false){   //input must be a graph input, or already initialized intermediate tensor
          throw std::runtime_error("TMVA SOFIE EyeLike Op Input Tensor is not found in model");
       }
@@ -57,7 +54,7 @@ public:
    }
 
 
-   std::string Generate(std::string OpName) override {
+   std::string Generate(std::string OpName){
       OpName = "op_" + OpName;
       if (fShape.empty()){
          throw std::runtime_error("TMVA SOFIE Operator EyeLike called to Generate without being initialized first");
@@ -69,8 +66,7 @@ public:
       // add a dummy statement to avoid warning for unused input
       out << SP << "(void) tensor_" << fNX << ";\n";
 
-      out << SP << "std::fill(tensor_" << fNY << ", tensor_" << fNY << " + " << length << ","
-          << 0 << ");\n";
+      out << SP << "fTensor_" << fNY << ".assign(" << length << ", 0);\n";
       out << SP << "for (int i = 0; i < " << fShape[0] << "; i++) {\n";
       out << SP << SP << "int j = i +" << fk << ";\n";
       out << SP << SP << "if (j >= 0 && j < " << fShape[1] << ")\n";

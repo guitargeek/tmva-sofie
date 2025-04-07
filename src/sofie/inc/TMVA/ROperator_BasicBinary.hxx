@@ -51,6 +51,33 @@ struct BinaryOperatorTrait<T, Pow> {
    static T Func (T t1, T t2) { return std::pow(t1,t2);}
 };
 
+template <typename T>
+struct TensorType {};
+template<>
+struct TensorType<float> {
+   static const std::string Name() { return "float"; }
+};
+template<>
+struct TensorType<double> {
+   static const std::string Name() { return "double"; }
+};
+template<>
+struct TensorType<int64_t> {
+   static const std::string Name() { return "int64_t"; }
+};
+template<>
+struct TensorType<int32_t> {
+   static const std::string Name() { return "int32_t"; }
+};
+template<>
+struct TensorType<uint32_t> {
+   static const std::string Name() { return "uint32_t"; }
+};
+template<>
+struct TensorType<uint64_t> {
+   static const std::string Name() { return "uint64_t"; }
+};
+
 template<typename T, EBasicBinaryOperator Op>
 class ROperator_BasicBinary final : public ROperator{
 private:
@@ -68,10 +95,7 @@ private:
 public:
    ROperator_BasicBinary(){}
    ROperator_BasicBinary(std::string nameA, std::string nameB, std::string nameY):
-      fNA(UTILITY::Clean_name(nameA)), fNB(UTILITY::Clean_name(nameB)), fNY(UTILITY::Clean_name(nameY)){
-         fInputTensorNames = { fNA, fNB };
-         fOutputTensorNames = { fNY };
-      }
+      fNA(UTILITY::Clean_name(nameA)), fNB(UTILITY::Clean_name(nameB)), fNY(UTILITY::Clean_name(nameY)){}
 
    // type of output given input
    std::vector<ETensorType> TypeInference(std::vector<ETensorType> input) override {
@@ -122,14 +146,10 @@ public:
             fNBroadcastedB = "Broadcasted" + fNB + "to" + fNY;
             if (model.IsInitializedTensor(fNB)) {
                auto data = model.GetInitializedTensorData(fNB);
-               std::cout << "data B " << ConvertShapeToString(fShapeB) << " : " <<
-                  ConvertValuesToString(ConvertShapeToLength(fShapeB), static_cast<T*>(data.get())) << std::endl;
                std::shared_ptr<void> broadcastedData(
                   UTILITY::UnidirectionalBroadcast<T>(static_cast<T *>(data.get()), fShapeB, fShapeY),
                   std::default_delete<T[]>());
                // do not update tensor B but add broadcasted one (since it can be input to some other operators)
-               std::cout << "broadcasted data B " << ConvertShapeToString(fShapeY) << " : " <<
-                  ConvertValuesToString(ConvertShapeToLength(fShapeY), static_cast<T*>(broadcastedData.get())) << std::endl;
                model.AddConstantTensor(fNBroadcastedB, model.GetTensorType(fNB), fShapeY, broadcastedData);
                fShapeB = fShapeY;
             } else {
@@ -142,18 +162,15 @@ public:
       }
       // check case of constant  output (if all inputs are defined)
       if (model.IsInitializedTensor(fNA) && model.IsInitializedTensor(fNB)) {
-         const std::string& nameA = fNBroadcastedA.empty()? fNA : fNBroadcastedA;
-         const std::string& nameB = fNBroadcastedB.empty()? fNB : fNBroadcastedB;
-         auto dataA = static_cast<T *>(model.GetInitializedTensorData(nameA).get());
-         auto dataB = static_cast<T *>(model.GetInitializedTensorData(nameB).get());
+         auto dataA = static_cast<T *>(model.GetInitializedTensorData(fNA).get());
+         auto dataB = static_cast<T *>(model.GetInitializedTensorData(fNB).get());
          std::vector<T> dataY(ConvertShapeToLength(fShapeY));
-         for (size_t i = 0; i < dataY.size(); i++) {
+         for (size_t i = 0; i < dataY.size(); i++)
             dataY[i] = BinaryOperatorTrait<T,Op>::Func(dataA[i], dataB[i]);
-         }
          model.AddConstantTensor<T>(fNY, fShapeY, dataY.data());
          // flag tensors to not be written in a fil
-         model.SetNotWritableInitializedTensor(nameA);
-         model.SetNotWritableInitializedTensor(nameB);
+         model.SetNotWritableInitializedTensor(fNA);
+         model.SetNotWritableInitializedTensor(fNB);
          fIsOutputConstant = true;
          if (model.Verbose())
             std::cout << "Binary op ---> " << fNY << "  " << ConvertShapeToString(fShapeY) << " : "
@@ -183,17 +200,22 @@ public:
       size_t length = ConvertShapeToLength(fShapeY);
       std::string typeName = TensorType<T>::Name();
       // Broadcast A if it's uninitialized
-      // use broadcasting function where we pass an already allocated tensor to minimize memory allocations
       if (fShapeA != fShapeY) {
          out << SP << "// Broadcasting uninitialized tensor " << fNA << "\n";
-         out << SP  << "TMVA::Experimental::SOFIE::UTILITY::UnidirectionalBroadcast<" << typeName << ">(tensor_" << fNA << ", " << ConvertShapeToString(fShapeA) << ", " << ConvertShapeToString(fShapeY)
-                         << ", fTensor_" << fNBroadcastedA << ");\n";
+         out << SP << "{\n";
+         out << SP << SP << typeName << "* data = TMVA::Experimental::SOFIE::UTILITY::UnidirectionalBroadcast<" << typeName << ">(tensor_" << fNA << ", " << ConvertShapeToString(fShapeA) << ", " << ConvertShapeToString(fShapeY) << ");\n";
+         out << SP << SP << "std::copy(data, data + " << length << ", tensor_" << fNBroadcastedA << ");\n";
+         out << SP << SP << "delete[] data;\n";
+         out << SP << "}\n";
       }
       // Broadcast B if it's uninitialized
       if (fShapeB != fShapeY) {
          out << SP << "// Broadcasting uninitialized tensor " << fNB << "\n";
-         out << SP << "TMVA::Experimental::SOFIE::UTILITY::UnidirectionalBroadcast<" << typeName << ">(tensor_" << fNB << ", " << ConvertShapeToString(fShapeB) << ", " << ConvertShapeToString(fShapeY)
-                   << ", fTensor_" << fNBroadcastedB << ");\n";
+         out << SP << "{\n";
+         out << SP << SP << typeName << "* data = TMVA::Experimental::SOFIE::UTILITY::UnidirectionalBroadcast<" << typeName << ">(tensor_" << fNB << ", " << ConvertShapeToString(fShapeB) << ", " << ConvertShapeToString(fShapeY) << ");\n";
+         out << SP << SP << "std::copy(data, data + " << length << ", tensor_" << fNBroadcastedB << ");\n";
+         out << SP << SP << "delete[] data;\n";
+         out << SP << "}\n";
       }
       const std::string& nameA = fNBroadcastedA.empty()? fNA : fNBroadcastedA;
       const std::string& nameB = fNBroadcastedB.empty()? fNB : fNBroadcastedB;
