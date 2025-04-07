@@ -4,9 +4,10 @@ project(TMVA-SOFIE
     DESCRIPTION "TMVA-SOFIE"
     LANGUAGES CXX)
 
-
 find_package(ROOT REQUIRED COMPONENTS TMVA)
 include(${ROOT_USE_FILE})
+
+find_package(Protobuf REQUIRED)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_INSTALL_BINDIR "bin" CACHE PATH "user executables (bin)")
